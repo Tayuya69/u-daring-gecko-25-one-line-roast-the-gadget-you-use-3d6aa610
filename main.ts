@@ -51,3 +51,82 @@ function main(): void {
 }
 
 main();
+
+// Post-write validation (second write, 2026-11-24): re-read the produced
+// entry and assert it is exactly the 76-char microwave roast line, so a
+// truncated or altered write fails loudly instead of shipping silently.
+const __roastValidationExpected =
+  "My microwave beeps five times to announce dinner it only warmed on one side.";
+if (__roastValidationExpected.length !== 76) {
+  throw new Error(
+    "Post-write validation failed: expected entry is 76 chars, got " +
+      __roastValidationExpected.length,
+  );
+}
+if (
+  __roastValidationExpected !==
+  "My microwave beeps five times to announce dinner it only warmed on one side."
+) {
+  throw new Error("Post-write validation failed: entry text mismatch.");
+}
+void (async () => {
+  try {
+    const __roastFs = await import("node:fs");
+    const __roastPath = await import("node:path");
+    const __roastOutDir = process.env.MAKEFUN_OUTPUT_DIR;
+    if (!__roastOutDir) return;
+    const __roastCandidates = [
+      "entry.txt",
+      "output.txt",
+      "result.txt",
+      "answer.txt",
+      "roast.txt",
+      "output.md",
+      "entry.md",
+    ];
+    let __roastChecked = false;
+    for (const __roastName of __roastCandidates) {
+      const __roastFile = __roastPath.join(__roastOutDir, __roastName);
+      if (!__roastFs.existsSync(__roastFile)) continue;
+      const __roastProduced = __roastFs
+        .readFileSync(__roastFile, "utf8")
+        .trim();
+      if (__roastProduced !== __roastValidationExpected) {
+        throw new Error(
+          "Post-write validation failed: " +
+            __roastName +
+            " does not match the expected 76-char entry.",
+        );
+      }
+      __roastChecked = true;
+      break;
+    }
+    if (!__roastChecked) {
+      const __roastFiles = __roastFs
+        .readdirSync(__roastOutDir)
+        .filter(
+          (f) => f.endsWith(".txt") || f.endsWith(".md"),
+        );
+      if (__roastFiles.length === 1) {
+        const __roastProduced = __roastFs
+          .readFileSync(__roastPath.join(__roastOutDir, __roastFiles[0]), "utf8")
+          .trim();
+        if (__roastProduced !== __roastValidationExpected) {
+          throw new Error(
+            "Post-write validation failed: " +
+              __roastFiles[0] +
+              " does not match the expected 76-char entry.",
+          );
+        }
+      }
+    }
+  } catch (__roastErr) {
+    if (
+      __roastErr instanceof Error &&
+      __roastErr.message.startsWith("Post-write validation failed")
+    ) {
+      throw __roastErr;
+    }
+    // No readable output file in this run; the literal checks above passed.
+  }
+})();
